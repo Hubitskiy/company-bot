@@ -147,8 +147,10 @@ class TrackLikeButton(BaseButton):
 
         for button in buttons:
             text, data = cls.get_text_and_data(track_id, like=not is_like)
+
+            method = playlist_manager.like if is_like else playlist_manager.dislike
             delay_thread_safe(
-                playlist_manager.like(sender_id=update.effective_user.id, track_id=track_id),
+                method(sender_id=update.effective_user.id, track_id=track_id),
                 playlist_manager.loop,
             )
             button.text = text
