@@ -1,0 +1,13 @@
+version: "3.1"
+
+
+services:
+  api:
+    build: .
+    image: telegra_music_bot
+    volumes:
+      - .:/app
+
+
+volumes:
+  bot-data:
