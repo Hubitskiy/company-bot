@@ -88,7 +88,8 @@ class PlaylistManager:
 
                 await asyncio.sleep(1)
             except Exception as e:
-                import traceback; traceback.print_exc()
+                import traceback;
+                traceback.print_exc()
                 self.logging.error(e)
 
     async def get_next_track_filename(self) -> str:
@@ -117,6 +118,9 @@ class PlaylistManager:
         try:
             track = self.playlist[0]
         except IndexError:
+            return
+
+        if track.filename and os.path.isfile(track.filename):
             return
 
         self.logging.debug(f'preload: {track.name}')
