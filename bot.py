@@ -14,7 +14,7 @@ from playlist_manager import PlaylistManager, get_track, delay_thread_safe
 from telegram.ext import Updater, MessageHandler, Filters, CommandHandler, CallbackContext, CallbackQueryHandler
 from telegram import Update, ChatAction, MessageEntity, InlineKeyboardMarkup
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 updater = Updater(token='1048865331:AAE6W4TfVoG54GMtbsP6hoQWX1C7dle6KUc', use_context=True)
 
@@ -37,7 +37,7 @@ def restricted(func):
         sender_id = update.effective_user.id
         if not auth_manager.is_authorized(sender_id):
             update.message.reply_text(
-                'Требуется пароль! Просто введи его строкой ниже. Используя /auth'
+                'Требуется пароль! Просто введи его строкой ниже. Используя /auth <password>'
             )
             return
         return func(update, context, *args, **kwargs)
@@ -141,6 +141,7 @@ def _volume(update: Update, context: CallbackContext):
 
 @restricted
 def _playlist(update: Update, context: CallbackContext):
+    print('sender_id', update, context)
     sender_id = update.effective_user.id
 
     string = f'В очереди: {len(manager.playlist)}\n\n'
@@ -185,8 +186,8 @@ def _unknown(update: Update, context: CallbackContext):
         text = TrackButton.make_text(track, is_current=is_current, num=num)
 
         context.bot.send_message(
-            chat_id=update.effective_chat.id,
             text=text,
+            chat_id=update.effective_chat.id,
             reply_markup=InlineKeyboardMarkup([[TrackRemoveButton.make(track.id)]])
         )
 

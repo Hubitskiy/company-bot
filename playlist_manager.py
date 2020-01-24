@@ -2,7 +2,6 @@ import asyncio
 import os
 import pickle
 import logging
-import random
 import subprocess
 from dataclasses import dataclass, field
 from typing import List, Callable, Optional
@@ -89,6 +88,7 @@ class PlaylistManager:
 
                 await asyncio.sleep(1)
             except Exception as e:
+                import traceback; traceback.print_exc()
                 self.logging.error(e)
 
     async def get_next_track_filename(self) -> str:
@@ -97,6 +97,7 @@ class PlaylistManager:
                 os.remove(self.current_track.filename)
 
         self.current_track = None
+
         filename = None
         while not filename:
             if len(self.playlist) == 0:
@@ -122,7 +123,7 @@ class PlaylistManager:
 
         await self._download_track(track)
 
-    async def _download_track(self, track):
+    async def _download_track(self, track) -> Optional[str]:
         if track.filename is not None and os.path.isfile(track.filename):
             return track.filename
 
@@ -131,7 +132,7 @@ class PlaylistManager:
             try:
                 self.logging.debug(f'download {attempt}: {track.name}')
                 download(filename)
-                self.logging.debug(f'downloaded {attempt}: {track.name} to {filename}')
+                self.logging.debug(f'download {attempt}: {track.name} saved to {filename}')
                 break
             except YandexMusicError:
                 continue
@@ -166,21 +167,19 @@ class PlaylistManager:
         self.save_playlist()
         return position
 
-    async def get_track(self, id: int) -> Optional[Track]:
-        if self.current_track and self.current_track.id == id:
-            return self.current_track
-        try:
-            return [track for track in self.playlist if track.id == id][0]
-        except IndexError:
-            return
+    async def get_tracks(self, track_id: int) -> List[Track]:
+        tracks = []
+        if self.current_track and self.current_track.id == track_id:
+            tracks.append(self.current_track)
+        return tracks + [track for track in self.playlist if track.id == track_id]
 
-    async def remove_track(self, id: int):
-        if self.current_track is not None and self.current_track.id == id:
+    async def remove_track(self, track_id: int):
+        if self.current_track is not None and self.current_track.id == track_id:
             self._skip = True
 
-        self.logging.info(f'remove: {id}')
+        self.logging.info(f'remove: {track_id}')
 
-        self.playlist = [track for track in self.playlist if track.id != id]
+        self.playlist = [track for track in self.playlist if track.id != track_id]
 
         self.save_playlist()
 
@@ -189,41 +188,39 @@ class PlaylistManager:
             track_id = track_id or self.current_track.id
 
         if not track_id:
+            self.logging.info(f'like: {sender_id} to {track_id}: Track id is null.')
             return
 
-        track = await self.get_track(track_id)
-        if not track:
-            return
+        tracks = await self.get_tracks(track_id)
+        for track in tracks:
+            track.likes.add(sender_id)
+            try:
+                track.dislikes.remove(sender_id)
+            except KeyError:
+                pass
 
-        self.logging.info(f'like: {sender_id} to {track_id}')
-
-        track.likes.add(sender_id)
-        try:
-            track.dislikes.remove(sender_id)
-        except KeyError:
-            pass
+        self.logging.info(f'like: {sender_id} to {track_id} up to {len(tracks)} tracks')
 
     async def dislike(self, sender_id, track_id: int = None):
-        if self.current_track:
+        if self.current_track is not None:
             track_id = track_id or self.current_track.id
 
         if not track_id:
+            self.logging.info(f'dislike: {sender_id} to {track_id}: Track id is null.')
             return
 
-        track = await self.get_track(track_id)
-        if not track:
-            return
+        tracks = await self.get_tracks(track_id)
+        for track in tracks:
+            track.dislikes.add(sender_id)
+            try:
+                track.likes.remove(sender_id)
+            except KeyError:
+                pass
 
-        self.logging.info(f'dislike: {sender_id} to {track_id}')
+            if len(track.dislikes) >= self.max_dislikes:
+                await self.remove_track(track_id)
 
-        track.dislikes.add(sender_id)
-        try:
-            track.likes.remove(sender_id)
-        except KeyError:
-            pass
-
-        if len(track.dislikes) >= self.max_dislikes:
-            await self.remove_track(track_id)
+        self.logging.info(f'dislike: {sender_id} to {track_id} up to {len(tracks)} tracks')
 
     def save_playlist(self):
         self.logging.debug(f'save playlist')
