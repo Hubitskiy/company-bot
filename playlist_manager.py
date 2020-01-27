@@ -210,12 +210,15 @@ class PlaylistManager:
 
         if tracks:
             track = tracks[0]
-            position = self.playlist.index(track)
-            if position > 0 and len(track.likes) >= self.max_dislikes:
-                self.playlist[position], self.playlist[position - 1] = (
-                    self.playlist[position - 1], self.playlist[position]
-                )
-                track.likes = set()
+            try:
+                position = self.playlist.index(track)
+                if position > 0 and len(track.likes) >= self.max_dislikes:
+                    self.playlist[position], self.playlist[position - 1] = (
+                        self.playlist[position - 1], self.playlist[position]
+                    )
+                    track.likes = set()
+            except ValueError:
+                pass
 
         self.logging.info(f'like: {sender_id} to {track_id} up to {len(tracks)} tracks')
 

@@ -3,6 +3,7 @@ import asyncio
 import re
 import logging
 from functools import wraps, partial
+from typing import List
 
 import telegram
 
@@ -45,12 +46,12 @@ def restricted(func):
     return wrapped
 
 
-def extract_track_ids(message):
+def extract_track_ids(message) -> List[int]:
     track_ids = []
 
     split = message.text.split(' ')
     try:
-        track_ids = [int(track_id) for track_id in split if not track_id.startswith('/')]
+        track_ids = [track_id for track_id in split if not track_id.startswith('/')]
     except ValueError:
         pass
 
@@ -58,7 +59,7 @@ def extract_track_ids(message):
         match = re.search(r'/track/([0-9]+)/?', url)
         track_ids.append(match.group(1))
 
-    return track_ids
+    return [int(track_id) for track_id in track_ids]
 
 
 def _start(update: Update, context: CallbackContext):
