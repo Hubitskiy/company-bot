@@ -51,7 +51,7 @@ def extract_track_ids(message) -> List[int]:
 
     split = message.text.split(' ')
     try:
-        track_ids = [track_id for track_id in split if not track_id.startswith('/')]
+        track_ids = [int(track_id) for track_id in split if not track_id.startswith('/')]
     except ValueError:
         pass
 
