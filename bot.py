@@ -27,7 +27,7 @@ loop = asyncio.get_event_loop()
 
 delay = partial(delay_thread_safe, loop=loop)
 
-manager = PlaylistManager(loop=loop, max_dislikes=1)
+manager = PlaylistManager(loop=loop, max_dislikes=2)
 auth_manager = AuthManager(password='1appservice$')
 
 
@@ -200,7 +200,6 @@ button_handlers = [
     PlaylistPageButton,
     DeleteMessageButton,
     PlaylistRefreshButton,
-
 ]
 
 
