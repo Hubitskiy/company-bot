@@ -166,7 +166,7 @@ class TrackDislikeButton(BaseButton):
 
     @classmethod
     def get_text_and_date(cls, track_id: int, disliked: bool):
-        text = '👎 Отменить' if disliked else '👎 Дизлайк'
+        text = '🚫 Отменить' if disliked else '👎 Дизлайк'
         data = cls.pattern + str(track_id) + '_' + str(int(disliked))
         return text, data
 
@@ -210,7 +210,7 @@ class TrackLikeButton(BaseButton):
 
     @classmethod
     def get_text_and_date(cls, track_id: int, liked: bool):
-        text = ' 👍 Отменить' if liked else '👍 Лайк'
+        text = ' 🚫 Отменить' if liked else '👍 Лайк'
         data = cls.pattern + str(track_id) + '_' + str(int(liked))
         return text, data
 
