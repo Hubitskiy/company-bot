@@ -16,7 +16,7 @@ def get_buttons(keyboard, callback_data=None, pattern=None):
         return buttons
 
     try:
-        if keyboard.callback_data == callback_data or keyboard.callback_data.startswith(pattern):
+        if keyboard.callback_data == callback_data or (pattern and keyboard.callback_data.startswith(pattern)):
             return [keyboard]
     except AttributeError:
         pass
@@ -46,8 +46,8 @@ def make_playlist_markup(sender_id: int, manager: PlaylistManager, page_num: int
     for idx, track in enumerate(page):
         buttons.append([
             TrackButton.make(track, is_current=page_num == 0 and idx == 0),
-            TrackDislikeButton.make(track.id, value=len(track.dislikes)),
-            TrackLikeButton.make(track.id, value=len(track.likes)),
+            TrackDislikeButton.make(track.id, disliked=sender_id in track.dislikes),
+            TrackLikeButton.make(track.id, liked=sender_id in track.likes),
         ])
 
     pagination = []
@@ -135,31 +135,40 @@ class TrackDislikeButton(BaseButton):
         query = update.callback_query
 
         track_id = int(query.data.split('_')[2])
+        disliked = bool(int(query.data.split('_')[3]))
 
         delay_thread_safe(
             playlist_manager.dislike(sender_id=update.effective_user.id, track_id=track_id),
             playlist_manager.loop,
         )
 
+        buttons = update_button(
+            query.message.reply_markup.inline_keyboard, callback_data=query.data
+        )
+
+        text, data = cls.get_text_and_date(track_id, not disliked)
+        for button in buttons:
+            button.text = text
+            button.callback_data = data
+
+        context.bot.edit_message_reply_markup(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            reply_markup=query.message.reply_markup,
+        )
+
         PlaylistRefreshButton.click(update, context, playlist_manager)
 
-        # buttons = update_button(
-        #     query.message.reply_markup.inline_keyboard, callback_data=query.data
-        # )
-        # for button in buttons:
-        #     pass
-
-        # button.text = ''
-
-        # context.bot.edit_message_reply_markup(
-        #     chat_id=query.message.chat_id,
-        #     message_id=query.message.message_id,
-        #     reply_markup=query.message.reply_markup,
-        # )
+    @classmethod
+    def make(cls, track_id: int, disliked: bool):
+        text, data = cls.get_text_and_date(track_id, disliked)
+        return InlineKeyboardButton(text, callback_data=data)
 
     @classmethod
-    def make(cls, track_id: int, value: int):
-        return InlineKeyboardButton(f'👎 Диз ({value})', callback_data=cls.pattern + str(track_id))
+    def get_text_and_date(cls, track_id: int, disliked: bool):
+        text = '👎 Отменить' if disliked else '👎 Дизлайк'
+        data = cls.pattern + str(track_id) + '_' + str(int(disliked))
+        return text, data
 
 
 class TrackLikeButton(BaseButton):
@@ -170,17 +179,40 @@ class TrackLikeButton(BaseButton):
         query = update.callback_query
 
         track_id = int(query.data.split('_')[2])
+        disliked = bool(int(query.data.split('_')[3]))
 
         delay_thread_safe(
             playlist_manager.like(sender_id=update.effective_user.id, track_id=track_id),
-            playlist_manager.loop
+            playlist_manager.loop,
+        )
+
+        buttons = update_button(
+            query.message.reply_markup.inline_keyboard, callback_data=query.data
+        )
+
+        text, data = cls.get_text_and_date(track_id, not disliked)
+        for button in buttons:
+            button.text = text
+            button.callback_data = data
+
+        context.bot.edit_message_reply_markup(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            reply_markup=query.message.reply_markup,
         )
 
         PlaylistRefreshButton.click(update, context, playlist_manager)
 
     @classmethod
-    def make(cls, track_id: int, value: int):
-        return InlineKeyboardButton(f'👍 Лайк ({value})', callback_data=cls.pattern + str(track_id))
+    def make(cls, track_id: int, liked: bool):
+        text, data = cls.get_text_and_date(track_id, liked)
+        return InlineKeyboardButton(text, callback_data=data)
+
+    @classmethod
+    def get_text_and_date(cls, track_id: int, liked: bool):
+        text = ' 👍 Отменить' if liked else '👍 Лайк'
+        data = cls.pattern + str(track_id) + '_' + str(int(liked))
+        return text, data
 
 
 class PlaylistPageButton(BaseButton):

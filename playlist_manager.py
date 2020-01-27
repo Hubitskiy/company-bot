@@ -38,7 +38,7 @@ def get_track(track_id: int) -> Optional[Track]:
     if not track_info['available']:
         return None
 
-    artists = ','.join(artist['name'] for artist in track_info['artists'])
+    artists = ', '.join(artist['name'] for artist in track_info['artists'])
     title = track_info["title"]
     name = f'{artists} - {title}'
 
@@ -46,9 +46,8 @@ def get_track(track_id: int) -> Optional[Track]:
 
 
 class PlaylistManager:
-    def __init__(self, loop, max_dislikes: int = 2, max_likes: int = 2, say_names: bool = False):
+    def __init__(self, loop, max_dislikes: int = 2, say_names: bool = False):
         self.max_dislikes = max_dislikes
-        self.max_likes = max_likes
         self.say_names = say_names
         self.loop = loop
 
@@ -167,6 +166,10 @@ class PlaylistManager:
         self.player.volume = volume
 
     async def add_track(self, track: Track) -> int:
+        for position, tr in enumerate(self.playlist):
+            if tr.id == track.id:
+                return position
+
         self.playlist.append(track)
         position = len(self.playlist)
 
@@ -191,6 +194,24 @@ class PlaylistManager:
 
         self.save_playlist()
 
+    async def swap_track(self, track, offset) -> bool:
+        try:
+            position = self.playlist.index(track)
+            if position == 0 and offset > 0:
+                return False
+
+            if position == len(self.playlist) - 1 and offset < 0:
+                return False
+
+            self.playlist[position], self.playlist[position - offset] = (
+                self.playlist[position - offset], self.playlist[position]
+            )
+            return True
+        except ValueError:
+            pass
+
+        return False
+
     async def like(self, sender_id, track_id: int = None):
         if self.current_track:
             track_id = track_id or self.current_track.id
@@ -200,24 +221,15 @@ class PlaylistManager:
             return
 
         tracks = await self.get_tracks(track_id)
-        for track in tracks:
-            track.likes.add(sender_id)
-            try:
-                track.dislikes.remove(sender_id)
-            except KeyError:
-                pass
 
-        if tracks:
-            track = tracks[0]
+        for track in tracks:
+            offset = -1
             try:
-                position = self.playlist.index(track)
-                if position > 0 and len(track.likes) >= int(self.max_likes):
-                    self.playlist[position], self.playlist[position - 1] = (
-                        self.playlist[position - 1], self.playlist[position]
-                    )
-                    track.likes = set()
-            except ValueError:
-                pass
+                track.likes.remove(sender_id)
+            except KeyError:
+                track.likes.add(sender_id)
+                offset = 1
+            await self.swap_track(track, offset=offset)
 
         self.logging.info(f'like: {sender_id} to {track_id} up to {len(tracks)} tracks')
 
@@ -231,11 +243,14 @@ class PlaylistManager:
 
         tracks = await self.get_tracks(track_id)
         for track in tracks:
-            track.dislikes.add(sender_id)
+            offset = 1
             try:
-                track.likes.remove(sender_id)
+                track.dislikes.remove(sender_id)
             except KeyError:
-                pass
+                track.dislikes.add(sender_id)
+                offset = -1
+
+            await self.swap_track(track, offset=offset)
 
             if len(track.dislikes) >= int(self.max_dislikes):
                 await self.remove_track(track_id)

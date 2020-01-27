@@ -17,7 +17,7 @@ from telegram import Update, ChatAction, MessageEntity, InlineKeyboardMarkup
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
-updater = Updater(token='1048865331:AAE6W4TfVoG54GMtbsP6hoQWX1C7dle6KUc', use_context=True)
+updater = Updater(token='961043700:AAGOELjF0XoU_zxejWm1BURcOaViO1zTkKo', use_context=True)
 
 BUTTON_PLAY_PAUSE = '⏯️ Играть'
 BUTTON_DISLIKE = '👎 Дизлайк'
@@ -28,7 +28,7 @@ loop = asyncio.get_event_loop()
 
 delay = partial(delay_thread_safe, loop=loop)
 
-manager = PlaylistManager(loop=loop, max_dislikes=3, max_likes=2)
+manager = PlaylistManager(loop=loop, max_dislikes=3)
 auth_manager = AuthManager(password='1appservice$')
 
 
