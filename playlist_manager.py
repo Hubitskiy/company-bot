@@ -64,6 +64,9 @@ class PlaylistManager:
 
     async def rotate_tracks(self):
         self.logging.debug('begin rotate tracks')
+
+        self.player.volume = 50
+
         while True:
             try:
                 await self._preload()
@@ -202,6 +205,15 @@ class PlaylistManager:
                 track.dislikes.remove(sender_id)
             except KeyError:
                 pass
+
+        if tracks:
+            track = tracks[0]
+            position = self.playlist.index(track)
+            if position > 0 and len(track.likes) >= self.max_dislikes:
+                self.playlist[position], self.playlist[position - 1] = (
+                    self.playlist[position - 1], self.playlist[position]
+                )
+                track.likes = set()
 
         self.logging.info(f'like: {sender_id} to {track_id} up to {len(tracks)} tracks')
 

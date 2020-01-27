@@ -1,28 +1,30 @@
 import math
 
+import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
 from playlist_manager import PlaylistManager, delay_thread_safe, Track
 
 
-def get_buttons(keyboard, callback_data):
+def get_buttons(keyboard, callback_data=None, pattern=None):
+    assert callback_data or pattern
     buttons = []
     if isinstance(keyboard, list):
         for key in keyboard:
-            buttons.extend(get_buttons(key, callback_data))
+            buttons.extend(get_buttons(key, callback_data=callback_data, pattern=pattern))
         return buttons
 
     try:
-        if keyboard.callback_data == callback_data:
+        if keyboard.callback_data == callback_data or keyboard.callback_data.startswith(pattern):
             return [keyboard]
     except AttributeError:
         pass
     return []
 
 
-def update_button(keyboard, callback_data, **kwargs):
-    buttons = get_buttons(keyboard, callback_data)
+def update_button(keyboard, callback_data=None, pattern=None, **kwargs):
+    buttons = get_buttons(keyboard, callback_data=callback_data, pattern=pattern)
 
     for button in buttons:
         for k, v in kwargs.items():
@@ -32,40 +34,37 @@ def update_button(keyboard, callback_data, **kwargs):
 
 
 def make_playlist_markup(sender_id: int, manager: PlaylistManager, page_num: int = 0, per_page: int = 15):
-    buttons = []
+    page = []
     if page_num == 0 and manager.current_track:
-        like = sender_id in manager.current_track.dislikes
-        buttons.append([
-            TrackButton.make(manager.current_track, is_current=True),
-            TrackLikeButton.make(manager.current_track.id, like=like)
-        ])
+        page.append(manager.current_track)
 
     total = math.ceil(len(manager.playlist) / per_page)
 
-    page = manager.playlist[page_num * per_page:(page_num + 1) * per_page]
+    page = page + manager.playlist[page_num * per_page:(page_num + 1) * per_page]
 
-    for track in page:
-        like = sender_id in track.dislikes
+    buttons = []
+    for idx, track in enumerate(page):
         buttons.append([
-            TrackButton.make(track, is_current=False),
-            TrackLikeButton.make(track.id, like=like)
+            TrackButton.make(track, is_current=page_num == 0 and idx == 0),
+            TrackDislikeButton.make(track.id, value=len(track.dislikes)),
+            TrackLikeButton.make(track.id, value=len(track.likes)),
         ])
 
     pagination = []
     if page_num > 0:
         pagination.append(
-            PlaylistPreviewPageButton.make(page_num - 1)
+            PlaylistPreviewPageButton.make(page_num)
         )
 
     if page_num + 1 < total:
         pagination.append(
-            PlaylistNextPageButton.make(page_num + 1)
+            PlaylistNextPageButton.make(page_num)
         )
 
     if pagination:
         buttons.append(pagination)
 
-    buttons.append([DeleteMessageButton.make()])
+    buttons.append([DeleteMessageButton.make(), PlaylistRefreshButton.make(page_num)])
 
     return InlineKeyboardMarkup(buttons)
 
@@ -128,50 +127,60 @@ class TrackRemoveButton(BaseButton):
         return InlineKeyboardButton('❌ Удалить', callback_data=cls.pattern + str(track_id))
 
 
-class TrackLikeButton(BaseButton):
-    pattern = 'like_track_'
-
-    yes_suffix = '_yes'
-    no_suffix = '_no'
+class TrackDislikeButton(BaseButton):
+    pattern = 'dislike_track_'
 
     @classmethod
     def click(cls, update: Update, context: CallbackContext, playlist_manager: PlaylistManager):
         query = update.callback_query
 
-        buttons = update_button(
-            query.message.reply_markup.inline_keyboard, callback_data=query.data
+        track_id = int(query.data.split('_')[2])
+
+        delay_thread_safe(
+            playlist_manager.dislike(sender_id=update.effective_user.id, track_id=track_id),
+            playlist_manager.loop,
         )
+
+        PlaylistRefreshButton.click(update, context, playlist_manager)
+
+        # buttons = update_button(
+        #     query.message.reply_markup.inline_keyboard, callback_data=query.data
+        # )
+        # for button in buttons:
+        #     pass
+
+        # button.text = ''
+
+        # context.bot.edit_message_reply_markup(
+        #     chat_id=query.message.chat_id,
+        #     message_id=query.message.message_id,
+        #     reply_markup=query.message.reply_markup,
+        # )
+
+    @classmethod
+    def make(cls, track_id: int, value: int):
+        return InlineKeyboardButton(f'👎 Диз ({value})', callback_data=cls.pattern + str(track_id))
+
+
+class TrackLikeButton(BaseButton):
+    pattern = 'like_track_'
+
+    @classmethod
+    def click(cls, update: Update, context: CallbackContext, playlist_manager: PlaylistManager):
+        query = update.callback_query
 
         track_id = int(query.data.split('_')[2])
-        is_like = query.data.split('_')[3] == cls.yes_suffix[1:]
 
-        for button in buttons:
-            text, data = cls.get_text_and_data(track_id, like=not is_like)
-
-            method = playlist_manager.like if is_like else playlist_manager.dislike
-            delay_thread_safe(
-                method(sender_id=update.effective_user.id, track_id=track_id),
-                playlist_manager.loop,
-            )
-            button.text = text
-            button.callback_data = data
-
-        context.bot.edit_message_reply_markup(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=query.message.reply_markup,
+        delay_thread_safe(
+            playlist_manager.like(sender_id=update.effective_user.id, track_id=track_id),
+            playlist_manager.loop
         )
 
-    @classmethod
-    def get_text_and_data(cls, track_id: int, like: bool = False):
-        callback_data = cls.pattern + str(track_id) + (cls.yes_suffix if like else cls.no_suffix)
-        text = '🚫 Отменить' if like else '👎 Дизлайк'
-        return text, callback_data
+        PlaylistRefreshButton.click(update, context, playlist_manager)
 
     @classmethod
-    def make(cls, track_id: int, like: bool = False):
-        text, data = cls.get_text_and_data(track_id, like=like)
-        return InlineKeyboardButton(text, callback_data=data)
+    def make(cls, track_id: int, value: int):
+        return InlineKeyboardButton(f'👍 Лайк ({value})', callback_data=cls.pattern + str(track_id))
 
 
 class PlaylistPageButton(BaseButton):
@@ -182,27 +191,44 @@ class PlaylistPageButton(BaseButton):
         query = update.callback_query
         sender_id = update.effective_user.id
 
-        page_num = int(query.data.split('_')[2])
+        page_num = 0
+        if query.data.startswith(cls.pattern):
+            page_num = int(query.data.split('_')[2])
+        else:
+            buttons = get_buttons(query.message.reply_markup.inline_keyboard, pattern=cls.pattern)
+            # get current page
+            if buttons:
+                print(buttons[0].callback_data)
+                page_num = int(buttons[0].callback_data.split('_')[3])
 
         markup = make_playlist_markup(sender_id, playlist_manager, page_num=page_num)
 
-        context.bot.edit_message_reply_markup(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=markup,
-        )
+        try:
+            context.bot.edit_message_reply_markup(
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id,
+                reply_markup=markup,
+            )
+        except telegram.error.BadRequest:
+            pass
 
 
 class PlaylistNextPageButton(PlaylistPageButton):
     @classmethod
-    def make(cls, page_num: int):
-        return InlineKeyboardButton('➡️', callback_data=cls.pattern + str(page_num))
+    def make(cls, current: int):
+        return InlineKeyboardButton('➡️', callback_data=cls.pattern + str(current + 1) + '_' + str(current))
 
 
 class PlaylistPreviewPageButton(PlaylistPageButton):
     @classmethod
-    def make(cls, page_num: int):
-        return InlineKeyboardButton('⬅️', callback_data=cls.pattern + str(page_num))
+    def make(cls, current: int):
+        return InlineKeyboardButton('⬅️', callback_data=cls.pattern + str(current + 1) + '_' + str(current))
+
+
+class PlaylistRefreshButton(PlaylistPageButton):
+    @classmethod
+    def make(cls, current: int):
+        return InlineKeyboardButton('🔄️ Обновить', callback_data=cls.pattern + str(current) + '_' + str(current))
 
 
 class DeleteMessageButton(BaseButton):

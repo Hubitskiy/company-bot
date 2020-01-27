@@ -7,8 +7,8 @@ from functools import wraps, partial
 import telegram
 
 from auth import AuthManager
-from bot_buttons import TrackButton, TrackLikeButton, TrackRemoveButton, make_playlist_markup, PlaylistPageButton, \
-    DeleteMessageButton
+from bot_buttons import TrackButton, TrackDislikeButton, TrackRemoveButton, make_playlist_markup, PlaylistPageButton, \
+    DeleteMessageButton, PlaylistRefreshButton, TrackLikeButton
 from playlist_manager import PlaylistManager, get_track, delay_thread_safe
 
 from telegram.ext import Updater, MessageHandler, Filters, CommandHandler, CallbackContext, CallbackQueryHandler
@@ -27,7 +27,7 @@ loop = asyncio.get_event_loop()
 
 delay = partial(delay_thread_safe, loop=loop)
 
-manager = PlaylistManager(loop=loop, max_dislikes=2)
+manager = PlaylistManager(loop=loop, max_dislikes=1)
 auth_manager = AuthManager(password='1appservice$')
 
 
@@ -194,10 +194,13 @@ def _unknown(update: Update, context: CallbackContext):
 
 button_handlers = [
     TrackButton,
-    TrackRemoveButton,
     TrackLikeButton,
+    TrackRemoveButton,
+    TrackDislikeButton,
     PlaylistPageButton,
     DeleteMessageButton,
+    PlaylistRefreshButton,
+
 ]
 
 
