@@ -46,8 +46,9 @@ def get_track(track_id: int) -> Optional[Track]:
 
 
 class PlaylistManager:
-    def __init__(self, loop, max_dislikes: int = 2, say_names: bool = False):
+    def __init__(self, loop, max_dislikes: int = 2, max_likes: int = 2, say_names: bool = False):
         self.max_dislikes = max_dislikes
+        self.max_likes = max_likes
         self.say_names = say_names
         self.loop = loop
 
@@ -210,7 +211,7 @@ class PlaylistManager:
             track = tracks[0]
             try:
                 position = self.playlist.index(track)
-                if position > 0 and len(track.likes) >= self.max_dislikes:
+                if position > 0 and len(track.likes) >= int(self.max_likes):
                     self.playlist[position], self.playlist[position - 1] = (
                         self.playlist[position - 1], self.playlist[position]
                     )
@@ -236,7 +237,7 @@ class PlaylistManager:
             except KeyError:
                 pass
 
-            if len(track.dislikes) >= self.max_dislikes:
+            if len(track.dislikes) >= int(self.max_dislikes):
                 await self.remove_track(track_id)
 
         self.logging.info(f'dislike: {sender_id} to {track_id} up to {len(tracks)} tracks')

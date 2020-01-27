@@ -28,7 +28,7 @@ loop = asyncio.get_event_loop()
 
 delay = partial(delay_thread_safe, loop=loop)
 
-manager = PlaylistManager(loop=loop, max_dislikes=2)
+manager = PlaylistManager(loop=loop, max_dislikes=3, max_likes=2)
 auth_manager = AuthManager(password='1appservice$')
 
 
@@ -76,7 +76,8 @@ def _start(update: Update, context: CallbackContext):
         'Просто отправь мне ссылку на трек с music.yandex.by\n'
         'Например `https://music.yandex.by/album/68299/track/583725`\n'
         'или только `583725`\n'
-        f'Если у трека {manager.max_dislikes} дизлайка, то он удаляется.\n',
+        f'Если у трека {manager.max_dislikes} дизлайка, то он удаляется.\n'
+        f'Если у трека {manager.max_likes} лайков, то он поднимается вверх!\n',
         reply_markup=reply_markup,
         parse_mode='Markdown',
     )
