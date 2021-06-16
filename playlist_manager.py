@@ -29,7 +29,7 @@ class Track:
 
 
 def get_track(track_id: int) -> Optional[Track]:
-    music_client = Client()
+    music_client = Client.from_credentials('katya.tishevitch@yandex.by', '375293893643k')
     download_infos = music_client.tracks_download_info(track_id, get_direct_links=True)
     download_infos = sorted(download_infos, key=lambda i: i['bitrate_in_kbps'], reverse=True)
     downloads = [info.download for info in download_infos]

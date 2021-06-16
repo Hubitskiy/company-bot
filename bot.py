@@ -17,7 +17,7 @@ from telegram import Update, ChatAction, MessageEntity, InlineKeyboardMarkup
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
-updater = Updater(token='961043700:AAGOELjF0XoU_zxejWm1BURcOaViO1zTkKo', use_context=True)
+updater = Updater(token='1871483354:AAG2KeIRxOYJb7CJUZVuBroZ1qBi3zLjRFg', use_context=True)
 
 BUTTON_PLAY_PAUSE = '⏯️ Играть'
 BUTTON_DISLIKE = '👎 Дизлайк'
